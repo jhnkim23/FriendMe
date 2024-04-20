@@ -1,5 +1,5 @@
-import Client from './classes/Client'
-import List_Node from './classes/List_Node'
+var Client = require('./classes/Client');
+var List_Node = require('./classes/List_Node');
 
 const express = require('express');
 const app = express();
@@ -113,7 +113,7 @@ function DistanceBetween(lat1,lon1,lat2,lon2) {
     var d = R * c; // Distance in km
     return d;
 }
-  
+
 function deg2rad(deg) {
     return deg * (Math.PI/180)
 }

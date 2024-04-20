@@ -1,4 +1,4 @@
-export default class Client {
+class Client {
     constructor(intro, radius, lon, lat) {
         this.intro = intro;
         this.radius = radius;
@@ -7,3 +7,4 @@ export default class Client {
     }
 }
 
+module.exports = Client;
