@@ -131,7 +131,7 @@ app.post('/add_to_waitlist', (req, res) => {
     const {lon} = req.body;
     const {intro} = req.body;
   
-    const client = new Client_Object(intro, radius, lon, lat, null, offer)
+    const client = new Client(intro, radius, lon, lat, null, offer)
     if(!radius) {
       res.status(418).send({message: "We need a radius"})
     }
@@ -184,7 +184,7 @@ app.post('/add_to_waitlist', (req, res) => {
     const {lon} = req.body;
     const {intro} = req.body;
   
-    const client = new Client_Object(intro, radius, lon, lat, null, offer)
+    const client = new Client(intro, radius, lon, lat, null, offer)
   
     if(!radius) {
       res.status(418).send({message: "We need a radius"})
