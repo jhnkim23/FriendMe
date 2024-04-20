@@ -1,12 +1,85 @@
+import React, { useState , useEffect } from 'react';
+import axios from 'axios';
 import './App.css';
 
 function App() {
-  const [radius, setRadius] = useState(0);
+  const [radius, setRadius] = useState(1);
   const [introduction, setIntroduction] = useState("");
+  var peerConnection;
+  var localStream;
+  var remoteStream;
+
+  async function initialize() {
+    peerConnection = new RTCPeerConnection();
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    remoteStream = new MediaStream();
+
+    // document.getElementById('user-1').srcObject = localStream;
+    // document.getElementById('user-2').srcObject = remoteStream;
+
+    localStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    peerConnection.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+        });
+    };
+  }
+
+  async function Create_Offer() {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+  }
+
+  useEffect(() => {
+    initialize();
+    console.log(peerConnection, localStream, remoteStream)
+  }, []);
+
+  async function Add_To_Waitlist() {
+    await Create_Offer();
+    let SDP = [JSON.stringify(peerConnection.localDescription), null];
+    console.log(SDP);
+    axios.post('http://localhost:8080/add_to_waitlist',
+        {
+          'client' :
+          {
+          'info':introduction,
+          'radius':radius,
+          'lat':10,
+          'lon':10,
+          },
+          'SDP' : SDP
+        }).then(res => {
+          console.log(res.data);
+    });
+  }
+
+  async function Radius_Match() {
+    axios.post('http://localhost:8080/radius_match', 
+      {
+        'info':introduction,
+        'radius':radius,
+        'lat':10,
+        'lon':10
+      }).then(res => {
+        res = res.data;
+        let message = res['message'];
+        if (message == 'Continue')
+          Radius_Match();
+        else if (message == 'EOL')
+          Add_To_Waitlist();
+        else {
+          console.log('match');
+        }
+    });
+  }
 
   async function QueryUser(e) {
     e.preventDefault();
-
+    Radius_Match();
   }
 
   return (
