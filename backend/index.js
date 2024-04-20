@@ -1,83 +1,86 @@
+var Client = require('./classes/Client');
+var List_Node = require('./classes/List_Node');
+
 const express = require('express');
 const app = express();
 const PORT = 8080;
 
-
 app.use( express.json() )
 
-
-app.listen(PORT)
 app.listen(
     PORT,
     () => console.log(`it's alive on http://localhost:${PORT}`)
-)
+);
 
-// UPDATE THIS TO HAVE PROPER TAIL AND DUMMY HEAD POINTERS
-// AFTER INTEGRATING CLASSES
-let waitlist = ListNode();
-let tail = ListNode();
+// DUMMY HEAD AND DUMMY TAIL
+let waitlist = new List_Node(null, null, null);
+let tail = waitlist.next = new List_Node(waitlist, null, null);
 
 // Data structures useful for radius-match
-let checkedInWaitlist = {};
+let waitlist_ind = {};
+let matched = {};
 let to_be_matched = new Set();
 
-let matched = {};
+// Store answer/offer for each client
+// Client -> [offer, answer]
+let SDP = {};
 
 function ClientFromData(info) {
-    const userData = info.body;
+    const userData = info;
     const introduction = userData['info'];
     const radius = userData['radius'];
     const lon = userData['lon'];
     const lat = userData['lat'];
-    const answer = userData['answer'];
-    const offer = userData['offer'];
-    const user = new Client(introduction, radius, lon, lat, answer, offer);
+    const user = new Client(introduction, radius, lon, lat);
 
     return user;
 }
 
-app.post('/check-for-matched', (req, res) => {
-    const user = ClientFromData(req);
+app.post('/check_for_matched', (req, res) => {
+    const user = ClientFromData(req.body);
 
     if (user in matched) {
         const userToSend = matched[user];
         res.send({
             message:    
             {
-                'introduction' : userToSend.info,
+                'intro' : userToSend.info,
                 'radius' : userToSend.radius,
                 'lon' : userToSend.lon,
                 'lat' : userToSend.lat,
-                'answer' : userToSend.answer,
-                'offer' : userToSend.offer
+                'offer' : SDP[userToSend][0],
+                'answer' : SDP[userToSend][1]
             }
-        })
+        });
     }
 
     else {
         res.send({
             message: 'Not Found'
-        })
+        });
     }
 });
 
-app.post('/radius-match', (req, res) => {
-    const user = ClientFromData(req);
+app.post('/radius_match', (req, res) => {
+    const user = ClientFromData(req.body);
     
     // either we get the last node we haven't checked yet, or the dummy head's next
-    var traverse = (user in checkedInWaitlist) ? checkedInWaitlist[user].next : waitlist.next;
+    var traverse = (user in waitlist_ind) ? waitlist_ind[user].next : waitlist.next;
     
     // make sure we aren't at the end of the list
     if (traverse != tail) {
         const checkWith = traverse.client;
-        checkedInWaitlist[user] = traverse;
+        waitlist_ind[user] = traverse;
 
         const distBetween = DistanceBetween(user.lat, user.lon, checkWith.lat, checkWith.lon);
         
         if (!(checkWith in to_be_matched) && distBetween <= user.radius && distBetween <= checkWith.radius) {
             to_be_matched.add(checkWith);
             res.send({
-                message: checkWith
+                message: {
+                    'client' : checkWith,
+                    'SDP' : SDP[checkWith] // [offer, answer] -> [offer, null]
+                }
             });
         }
         
@@ -109,103 +112,112 @@ function DistanceBetween(lat1,lon1,lat2,lon2) {
     var d = R * c; // Distance in km
     return d;
 }
-  
+
 function deg2rad(deg) {
     return deg * (Math.PI/180)
 }
 
-/*
-Check person: (radius, lat, long)
-Person Data inside WL: (radius, lat, long, offer)
-
-add to WL(radius, lat, long, offer):
-remove from WL():
-
-*/
-
-
 app.post('/add_to_waitlist', (req, res) => {
-    const {offer} = req.body;
-    const {radius} = req.body;
-    const {lat} = req.body;
-    const {lon} = req.body;
-    const {intro} = req.body;
-  
-    const client = new Client(intro, radius, lon, lat, null, offer)
-    if(!radius) {
-      res.status(418).send({message: "We need a radius"})
+    const data = req.body;
+    const user = ClientFromData(data['client']);
+    const SDP_data = data['SDP'];
+
+    if(user.radius <= 0) {
+      res.status(418).send({message: "We need a radius"});
     }
-    if(!lon || !lat){
-      res.status(418).send({message: "We need a location"})
+    if(user.lon == null || user.lat == null){
+      res.status(418).send({message: "We need a location"});
     }
-    if(!offer) {
-      res.status(418).send({message: "We need a offer"})
+    if(SDP_data[0] == null) {
+      res.status(418).send({message: "We need a offer"});
     }
-  
-    curr = waitlist.next;
-  
-    while(curr.next.val != waitlist.val){
-      curr = curr.next;
-    }
-  
-    new_node = new Node(curr.next, curr, client);
-    curr.next = new_node;
-    new_node.next.prev(new_node);
-  
+    
+    SDP[user] = SDP_data;
+
+    new_node = new List_Node(tail.prev, tail, user);
+    tail.prev.next = new_node;
+    tail.prev = new_node;
+
     res.status(200).send({
       message: 'client added successfully to waitlist'
-    })
-  })
-  
-  app.post('/add_matched', (req, res) => {
-      const{key} = req.body;
-      const{value} = req.body;
-      matched.set(key, value);
-      to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
-  
-      res.status(200).send({
-          message: "added key value pair successfully to matched"
-      })
-  })
-  
-  app.post('/remove_matched', (req, res) => {
-      const{key} = req.body;
-      matched.delete(key);
-  
-      res.status(200).send({
-          message: "removed key value pair successfully from matched"
-      })
-  })
-  
-  app.post('/remove_waitlist', (req, res) => {
-    const {offer} = req.body;
-    const {radius} = req.body;
-    const {lat} = req.body;
-    const {lon} = req.body;
-    const {intro} = req.body;
-  
-    const client = new Client(intro, radius, lon, lat, null, offer)
-  
-    if(!radius) {
-      res.status(418).send({message: "We need a radius"})
+    });
+});
+
+app.post('/remove_waitlist', (req, res) => {
+    const user = ClientFromData(req.body);
+
+    if (user.radius == null) {
+        res.status(418).send({message: "We need a radius"});
     }
-    if(!lon || !lat){
-      res.status(418).send({message: "We need a location"})
+    if(user.lon == null || user.lat == null){
+        res.status(418).send({message: "We need a location"});
     }
-    if(!offer) {
-      res.status(418).send({message: "We need a offer"})
+
+    if (user in waitlist_ind) {
+        user_to_remove = waitlist_ind[user]; //ListNode
+        user_to_remove.prev.next = user_to_remove.next;
+        user_to_remove.next.prev = user_to_remove.prev;
+
+        res.status(200).send({
+            message: "Client object successfully removed from WL"
+        });
     }
+
+    else {
+        res.status(400).send({
+            message: 'No matched user associated with given user to remove'
+        });
+    }
+});
   
-    curr = waitlist;
-    curr = curr.next;
-    while (curr.val != waitlist && curr.val != client) {
-      curr = curr.next;
-    }
-    if (!curr.val.intro){
-      res.status(418).send({message: "Client object not found in WL"})
-    }
-    curr.prev.next = curr.next;
-    curr.next.prev = curr.prev;
-    res.status(200).send({message: "Client object successfully removed from WL"})
-  
-  })
+app.post('/add_matched', (req, res) => {
+    const data = req.body;
+    const key = ClientFromData(data['key']);
+    const value = ClientFromData(data['value']);
+
+    matched[key] = value;
+    to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
+
+    res.status(200).send({
+        message: "added key value pair successfully to matched"
+    });
+});
+
+app.post('/remove_matched', (req, res) => {
+    const user = ClientFromData(req.body);
+    delete matched[user];
+
+    res.status(200).send({
+        message: "removed key value pair successfully from matched"
+    });
+});
+
+app.post('/remove_to_be_matched', (req, res) => {
+    const user = ClientFromData(req.body);
+    delete to_be_matched[user];
+
+    res.status(200).send({
+        message: "removed key successfully from to_be_matched"
+    });
+});
+
+app.post('/add_SDP', (req, res) => {
+    const data = req.body;
+    const user = ClientFromData(data['client']);
+    const add_SDP = data['SDP'];
+    
+    SDP[user] = add_SDP;
+    res.status(200).send({
+        message: "added key value pair successfully to SDP"
+    });
+});
+
+app.post('/remove_SDP', (req, res) => {
+    const user = ClientFromData(req.body);
+    delete SDP[user];
+
+    res.status(200).send({
+        message: "removed key value pair successfully from SDP"
+    });
+});
+

@@ -1,7 +1,9 @@
 class List_Node {
-    constructor(prev, client_object) {
+    constructor(prev, next, client_object) {
         this.prev = prev;
-        this.next = null;
-        this.client_object = client_object;
+        this.next = next;
+        this.client = client_object;
     }
 }
+
+module.exports = List_Node;
