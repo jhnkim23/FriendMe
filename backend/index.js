@@ -1,10 +1,11 @@
+import Client from './classes/Client'
+import List_Node from './classes/List_Node'
+
 const express = require('express');
 const app = express();
 const PORT = 8080;
 
-
 app.use( express.json() )
-
 
 app.listen(PORT)
 app.listen(
@@ -12,10 +13,9 @@ app.listen(
     () => console.log(`it's alive on http://localhost:${PORT}`)
 )
 
-// UPDATE THIS TO HAVE PROPER TAIL AND DUMMY HEAD POINTERS
-// AFTER INTEGRATING CLASSES
-let waitlist = ListNode();
-let tail = ListNode();
+// DUMMY HEAD AND DUMMY TAIL
+let waitlist = new List_Node(null, null);
+let tail = waitlist.next = new List_Node(waitlist, null);
 
 // Data structures useful for radius-match
 let checkedInWaitlist = {};
