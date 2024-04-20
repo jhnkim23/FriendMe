@@ -1,11 +1,9 @@
 export default class Client {
-    constructor(intro, radius, lon, lat, answer, offer) {
+    constructor(intro, radius, lon, lat) {
         this.intro = intro;
         this.radius = radius;
         this.lon = lon;
         this.lat = lat; 
-        this.answer = answer;
-        this.offer = offer; 
     }
 }
 

@@ -1,7 +1,7 @@
 export default class List_Node {
-    constructor(prev, client_object) {
+    constructor(prev, next, client_object) {
         this.prev = prev;
-        this.next = null;
+        this.next = next;
         this.client = client_object;
     }
 }
