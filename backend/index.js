@@ -17,8 +17,8 @@ let to_be_matched = new Set();
 
 let matched = {};
 
-app.post('/check-for-matched', (req, res) => {
-    const userData = req.body;
+function ClientFromData(info) {
+    const userData = info.body;
     const introduction = userData['info'];
     const radius = userData['radius'];
     const lon = userData['lon'];
@@ -26,6 +26,12 @@ app.post('/check-for-matched', (req, res) => {
     const answer = userData['answer'];
     const offer = userData['offer'];
     const user = new Client(introduction, radius, lon, lat, answer, offer);
+
+    return user;
+}
+
+app.post('/check-for-matched', (req, res) => {
+    const user = ClientFromData(req);
 
     if (user in matched) {
         const userToSend = matched[user];
@@ -41,7 +47,7 @@ app.post('/check-for-matched', (req, res) => {
             }
         })
     }
-    
+
     else {
         res.send({
             message: 'Not Found'
@@ -50,14 +56,7 @@ app.post('/check-for-matched', (req, res) => {
 });
 
 app.post('/radius-match', (req, res) => {
-    const userData = req.body;
-    const introduction = userData['info'];
-    const radius = userData['radius'];
-    const lon = userData['lon'];
-    const lat = userData['lat'];
-    const answer = userData['answer'];
-    const offer = userData['offer'];
-    const user = new Client(introduction, radius, lon, lat, answer, offer);
+    const user = ClientFromData(req);
     
     // either we get the last node we haven't checked yet, or the dummy head's next
     var traverse = (user in checkedInWaitlist) ? checkedInWaitlist[user].next : waitlist.next;
