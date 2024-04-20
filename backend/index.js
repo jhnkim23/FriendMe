@@ -7,11 +7,10 @@ const PORT = 8080;
 
 app.use( express.json() )
 
-app.listen(PORT)
 app.listen(
     PORT,
     () => console.log(`it's alive on http://localhost:${PORT}`)
-)
+);
 
 // DUMMY HEAD AND DUMMY TAIL
 let waitlist = new List_Node(null, null, null);
@@ -27,7 +26,7 @@ let to_be_matched = new Set();
 let SDP = {};
 
 function ClientFromData(info) {
-    const userData = info.body;
+    const userData = info;
     const introduction = userData['info'];
     const radius = userData['radius'];
     const lon = userData['lon'];
@@ -37,15 +36,15 @@ function ClientFromData(info) {
     return user;
 }
 
-app.post('/check-for-matched', (req, res) => {
-    const user = ClientFromData(req);
+app.post('/check_for_matched', (req, res) => {
+    const user = ClientFromData(req.body);
 
     if (user in matched) {
         const userToSend = matched[user];
         res.send({
             message:    
             {
-                'introduction' : userToSend.info,
+                'intro' : userToSend.info,
                 'radius' : userToSend.radius,
                 'lon' : userToSend.lon,
                 'lat' : userToSend.lat,
@@ -62,8 +61,8 @@ app.post('/check-for-matched', (req, res) => {
     }
 });
 
-app.post('/radius-match', (req, res) => {
-    const user = ClientFromData(req);
+app.post('/radius_match', (req, res) => {
+    const user = ClientFromData(req.body);
     
     // either we get the last node we haven't checked yet, or the dummy head's next
     var traverse = (user in waitlist_ind) ? waitlist_ind[user].next : waitlist.next;
@@ -120,7 +119,6 @@ function deg2rad(deg) {
 
 app.post('/add_to_waitlist', (req, res) => {
     const data = req.body;
-
     const user = ClientFromData(data['client']);
     const SDP_data = data['SDP'];
 
@@ -148,10 +146,10 @@ app.post('/add_to_waitlist', (req, res) => {
 app.post('/remove_waitlist', (req, res) => {
     const user = ClientFromData(req.body);
 
-    if (radius == null) {
+    if (user.radius == null) {
         res.status(418).send({message: "We need a radius"});
     }
-    if(lon == null || lat == null){
+    if(user.lon == null || user.lat == null){
         res.status(418).send({message: "We need a location"});
     }
 
@@ -177,7 +175,7 @@ app.post('/add_matched', (req, res) => {
     const key = ClientFromData(data['key']);
     const value = ClientFromData(data['value']);
 
-    matched.set(key, value);
+    matched[key] = value;
     to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
 
     res.status(200).send({
@@ -187,7 +185,7 @@ app.post('/add_matched', (req, res) => {
 
 app.post('/remove_matched', (req, res) => {
     const user = ClientFromData(req.body);
-    matched.delete(user);
+    delete matched[user];
 
     res.status(200).send({
         message: "removed key value pair successfully from matched"
@@ -196,7 +194,7 @@ app.post('/remove_matched', (req, res) => {
 
 app.post('/remove_to_be_matched', (req, res) => {
     const user = ClientFromData(req.body);
-    to_be_matched.delete(user)
+    delete to_be_matched[user];
 
     res.status(200).send({
         message: "removed key successfully from to_be_matched"
@@ -208,7 +206,7 @@ app.post('/add_SDP', (req, res) => {
     const user = ClientFromData(data['client']);
     const add_SDP = data['SDP'];
     
-    SDP.set(user, add_SDP);
+    SDP[user] = add_SDP;
     res.status(200).send({
         message: "added key value pair successfully to SDP"
     });
@@ -216,7 +214,7 @@ app.post('/add_SDP', (req, res) => {
 
 app.post('/remove_SDP', (req, res) => {
     const user = ClientFromData(req.body);
-    matched.delete(user);
+    delete SDP[user];
 
     res.status(200).send({
         message: "removed key value pair successfully from SDP"
