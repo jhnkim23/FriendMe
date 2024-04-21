@@ -8,10 +8,6 @@ function App() {
   const [introduction, setIntroduction] = useState("");
   const [latitude, setLatitude] = useState(0.0);
   const [longitude, setLongitude] = useState(0.0);
-  // const [LocalStream, setLocalStream] = useState(null);
-  // const [RemoteStream, setRemoteStream] = useState(null);
-  // const localVideoRef = useRef(null);
-  // const remoteVideoRef = useRef(null);
 
 
   var peerConnection;
@@ -206,13 +202,25 @@ function App() {
         <video className="video-player" id="user-2" autoPlay playsInline></video>
       </div>
 
-      <label htmlFor="userInput">Tell us a little bit about yourself: </label>
-      <input type="text" id="userInput" name="userInput" placeholder="Type your introduction" value = {introduction} onChange = {handleIntroInput}/>
+      <label htmlFor="userInput" id = "intro_input_label">Tell us a little bit about yourself: </label>
 
-      <Slider radius = {radius} setRadius = {setRadius}/>
-
-      <SubmitButton title="find" onClick={QueryUser}/>
-      <SubmitButton title = "test" onClick = {Add_Answer}/>
+      <div id = "userInput">
+        <input type="text" name="userInput" placeholder="Type your introduction" value = {introduction} onChange = {handleIntroInput}/>
+      </div>
+      
+      <div id = "radiusInput">
+        <label htmlFor="radiusInput">Specify the radius using the below slider: </label>
+      </div>
+      
+      <div id = "slider">
+        <Slider radius = {radius} setRadius = {setRadius}/>
+      </div>
+      
+      <div id = "submitButton">
+        <SubmitButton title="Find Someone!" onClick={QueryUser}/>
+        <SubmitButton title = "test" onClick = {Add_Answer}/>
+      </div>
+      
     </div>
   );
 }

@@ -1,0 +1,38 @@
+.App {
+    background-color: orange;
+    min-height: 100vh;
+}
+h2 {
+    text-align: center;
+}
+
+#intro_input_label {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#userInput {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+#radiusInput {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+}
+
+#slider {
+    margin-top: 20px;
+}
+
+#submitButton {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 100px;
+}

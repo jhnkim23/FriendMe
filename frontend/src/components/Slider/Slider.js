@@ -4,8 +4,6 @@ import './Slider.css'
 function Slider({radius, setRadius}) {    
     return (
         <>
-            <label htmlFor="radiusInput">Specify the radius using the below slider: </label>
-
             <ReactSlider
                 className="customSlider"
                 trackClassName="customSlider-track"
