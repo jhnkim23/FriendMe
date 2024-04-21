@@ -33,6 +33,49 @@ function App() {
     await peerConnection.setLocalDescription(offer);
   }
 
+  async function Create_Answer(offer){
+    offer = JSON.parse(offer)
+    await peerConnection.setRemoteDescription(offer);
+    let answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    //This might be better if the method was like split in two
+    let SDP = [null, JSON.stringify(peerConnection.localDescription)];
+    console.log("answer")
+    console.log(SDP)
+    axios.post('http://localhost:8080/add_SDP',
+    {
+      'client':
+      {
+        'info': introduction,
+        'radius': radius,
+        'lat': 10,
+        'lon': 10
+      },
+      'SDP': SDP
+    }).then(res => {
+      console.log(res.data)
+    });
+  }
+
+  async function Add_To_Matched(key, value) {
+    axios.post('http://localhost:8080/add_matched',{
+      'key': key,
+      'value': value
+    }).then(res => {
+      res = res.data;
+      let message = res['message']
+      console.log("check")
+      if (message =="added key value pair successfully to matched"){
+        console.log("poll")
+      }
+      else{
+        console.log(message)
+        console.log("something in the backend is broken I think, or the key value params you're passing are wrong")
+      }
+    });
+
+  }
+
   useEffect(() => {
     initialize();
     console.log(peerConnection, localStream, remoteStream)
@@ -73,15 +116,57 @@ function App() {
           Add_To_Waitlist();
         else {
           console.log('match');
+          let offer = message['SDP'][0]
+          console.log(offer)
+          Create_Answer(offer);
+          Add_To_Matched(message['client'], {
+            'info': introduction,
+            'radius': radius,
+            'lat': 10,
+            'lon': 10
+          })
+        }
+    });
+  }
+
+  async function Radius_Match_Test() {
+    axios.post('http://localhost:8080/radius_match', 
+      {
+        'info':"Test info",
+        'radius':2,
+        'lat':10,
+        'lon':10
+      }).then(res => {
+        res = res.data;
+        let message = res['message'];
+        if (message == 'Continue')
+          Radius_Match();
+        else if (message == 'EOL')
+          Add_To_Waitlist();
+        else {
+          console.log('match');
+          let offer = message['SDP'][0]
+          //console.log(offer)
+          Create_Answer(offer);
+          Add_To_Matched(message['client'], {
+            'info': "Test info",
+            'radius': 2,
+            'lat': 10,
+            'lon': 10
+          })
         }
     });
   }
 
   async function QueryUser(e) {
     e.preventDefault();
-    Radius_Match();
+    await Radius_Match();
+    Radius_Match_Test();
   }
-
+  async function QueryUserTesting(e){
+    e.preventDefault();
+    await Radius_Match_Test();
+  }
   return (
     <div className="App">
       <SubmitButton title="find" onClick={QueryUser}/>
@@ -90,9 +175,9 @@ function App() {
 }
 
 function SubmitButton({title, onClick}) {
-  return (
-    <button onClick={onClick}> {title} </button>
-  )
+return (
+  <button onClick={onClick}> {title} </button>
+)
 }
 
 export default App;
