@@ -11,16 +11,15 @@ function App() {
 
   useEffect(() => {
     initialize();
-    console.log(peerConnection, localStream, remoteStream)
   }, []);
 
   async function initialize() {
     peerConnection = new RTCPeerConnection();
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
     remoteStream = new MediaStream();
 
-    // document.getElementById('user-1').srcObject = localStream;
-    // document.getElementById('user-2').srcObject = remoteStream;
+    document.getElementById('user1').srcObject = localStream;
+    document.getElementById('user2').srcObject = remoteStream;
 
     localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream);
@@ -82,8 +81,6 @@ function App() {
     });
 
   }
-
-  
 
   async function Add_To_Waitlist() {
     await Create_Offer();
@@ -166,12 +163,10 @@ function App() {
 
 
   async function Add_Answer(answer, answer_from) {
-
     answer = JSON.parse(answer);
-    console.log(peerConnection.remoteDescription)
     await peerConnection.setRemoteDescription(answer);
-    //Add 6's SDP offer to 2's remote stream
     console.log('Add answer triggered');
+    //Add 6's SDP offer to 2's remote stream
     //let SDP = [JSON.stringify(peerConnection.localDescription), null];
 
     // need polling 
@@ -261,7 +256,13 @@ function App() {
       if (sender) {
         let answer_from = poll_response['message']['client']
         let answer = poll_response['message']['SDP'][1];
-        Add_Answer(answer, answer_from);
+        await Add_Answer(answer, answer_from);
+        console.log(peerConnection.remoteDescription);
+        console.log(peerConnection.localDescription);
+      }
+      else{
+        console.log(peerConnection.remoteDescription);
+        console.log(peerConnection.localDescription);
       }
     }
   }
@@ -276,11 +277,17 @@ function App() {
     await Radius_Match_Test();
   }
   return (
-    <div className="App">
-      <SubmitButton title="find" onClick={QueryUser}/>
-      <SubmitButton title="find2" onClick={QueryUserTesting}/>
-      <SubmitButton title="test" onClick={Add_Answer}/>
-    </div>
+    <>
+      <div className="PeerConnection">
+        <SubmitButton title="find" onClick={QueryUser}/>
+        <SubmitButton title="find2" onClick={QueryUserTesting}/>
+        <SubmitButton title="test" onClick={Add_Answer}/>
+      </div>
+      <div className="VideoPlayers">
+        <video className="video-player" id="user1" autoPlay playsInline></video>
+        <video className="video-player" id="user2" autoPlay playsInline></video>
+      </div>
+    </>
   );
 }
 
@@ -289,5 +296,11 @@ return (
   <button onClick={onClick}> {title} </button>
 )
 }
+
+// function VideoPlayer({ref, id}) {
+//   return (
+//     <video ref={ref} class="video-player" id={id} autoplay playsinline></video>
+//   )
+// }
 
 export default App;

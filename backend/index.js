@@ -100,6 +100,7 @@ app.post('/radius_match', (req, res) => {
 
     // if (traverse == tail) {
     else {
+        delete waitlist_ind[user];
         res.send({
             message: 'EOL'
         });
