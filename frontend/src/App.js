@@ -9,6 +9,11 @@ function App() {
   var localStream;
   var remoteStream;
 
+  useEffect(() => {
+    initialize();
+    console.log(peerConnection, localStream, remoteStream)
+  }, []);
+
   async function initialize() {
     peerConnection = new RTCPeerConnection();
     localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
@@ -33,10 +38,26 @@ function App() {
     await peerConnection.setLocalDescription(offer);
   }
 
-  useEffect(() => {
-    initialize();
-    console.log(peerConnection, localStream, remoteStream)
-  }, []);
+  async function Check_If_Matched() {
+    let poll_response;
+    await axios.post('http://localhost:8080/check_for_matched',
+      {
+        'info':introduction,
+        'radius':radius,
+        'lat':10,
+        'lon':10,
+      }).then(res => {
+        poll_response = res.data;
+    });
+    
+    if (poll_response['message'] == 'Not Found') {
+      console.log('not found');
+      setTimeout(Check_If_Matched, 1000);
+    }
+    else {
+      console.log('matched');
+    }
+  }
 
   async function Add_To_Waitlist() {
     await Create_Offer();
@@ -53,7 +74,7 @@ function App() {
           },
           'SDP' : SDP
         }).then(res => {
-          console.log(res.data);
+          Check_If_Matched();
     });
   }
 
