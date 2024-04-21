@@ -9,6 +9,11 @@ function App() {
   var localStream;
   var remoteStream;
 
+  useEffect(() => {
+    initialize();
+    console.log(peerConnection, localStream, remoteStream)
+  }, []);
+
   async function initialize() {
     peerConnection = new RTCPeerConnection();
     localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
@@ -43,6 +48,7 @@ function App() {
     let SDP = [null, JSON.stringify(peerConnection.localDescription)];
     console.log("answer")
     console.log(SDP)
+
     axios.post('http://localhost:8080/add_SDP',
     {
       'client':
@@ -67,7 +73,7 @@ function App() {
       let message = res['message']
       console.log("check")
       if (message =="added key value pair successfully to matched"){
-        console.log("poll")
+        Check_If_Matched(false);
       }
       else{
         console.log(message)
@@ -77,10 +83,7 @@ function App() {
 
   }
 
-  useEffect(() => {
-    initialize();
-    console.log(peerConnection, localStream, remoteStream)
-  }, []);
+  
 
   async function Add_To_Waitlist() {
     await Create_Offer();
@@ -98,6 +101,7 @@ function App() {
           'SDP' : SDP
         }).then(res => {
           console.log(res.data);
+          Check_If_Matched(true);
     });
   }
 
@@ -108,7 +112,7 @@ function App() {
         'radius':radius,
         'lat':10,
         'lon':10
-      }).then(res => {
+      }).then(async res => {
         res = res.data;
         let message = res['message'];
         if (message == 'Continue')
@@ -119,7 +123,7 @@ function App() {
           console.log('match');
           let offer = message['SDP'][0]
           console.log(offer)
-          Create_Answer(offer);
+          await Create_Answer(offer);
           Add_To_Matched(message['client'], 
           {
             'info': introduction,
@@ -138,7 +142,7 @@ function App() {
         'radius':2,
         'lat':10,
         'lon':10
-      }).then(res => {
+      }).then(async res => {
         res = res.data;
         let message = res['message'];
         if (message == 'Continue')
@@ -149,7 +153,7 @@ function App() {
           console.log('match');
           let offer = message['SDP'][0]
           //console.log(offer)
-          Create_Answer(offer);
+          await Create_Answer(offer);
           Add_To_Matched(message['client'], {
             'info': "Test info",
             'radius': 2,
@@ -159,6 +163,109 @@ function App() {
         }
     });
   }
+
+
+  async function Add_Answer(answer, answer_from) {
+
+    answer = JSON.parse(answer);
+    console.log(peerConnection.remoteDescription)
+    await peerConnection.setRemoteDescription(answer);
+    //Add 6's SDP offer to 2's remote stream
+    console.log('Add answer triggered');
+    //let SDP = [JSON.stringify(peerConnection.localDescription), null];
+
+    // need polling 
+
+    // let answer = JSON.parse(document.getElementById('answer-sdp').value)
+    // console.log('answer:', answer)
+    // if (!peerConnection.currentRemoteDescription){
+    //     peerConnection.setRemoteDescription(answer);
+    // }
+
+    //let remote_user = null
+    let remote_user = answer_from;
+    //Get 6's data first from matched dictionary by querying 2:6
+
+
+      //Remove 2 from waiting list
+    axios.post('http://localhost:8080/remove_waitlist', 
+    {'info':introduction,
+    'radius':radius,
+    'lat':10,
+    'lon':10,}).then(res => {
+      console.log(res.data['message']);
+    });
+
+  //Remove 2 from to_be_matched
+  axios.post('http://localhost:8080/remove_to_be_matched', 
+    {
+      'info':introduction,
+      'radius':radius,
+      'lat':10,
+      'lon':10,
+    }).then(res => {
+      console.log(res.data);
+    });
+
+  //add 6:2 -> signifies to client 1 that client 2 has agreed
+  axios.post('http://localhost:8080/add_matched',
+    {
+      'key' : remote_user,
+      'value' : {
+        'info':introduction,
+        'radius':radius,
+        'lat':10,
+        'lon':10,
+      }
+    }
+  ).then(res => {
+    console.log(res.data);
+  });
+
+  //then remove 2:6
+  axios.post('http://localhost:8080/remove_matched',
+    {
+      'key' : {
+        'info': introduction,
+        'radius' : 5,
+        'lat' : 5,
+        'lon' : 5
+      },
+      'value' : remote_user
+    }
+  ).then(res => {
+    console.log(res.data);
+  });
+
+    
+  }
+
+  async function Check_If_Matched(sender) {
+    let poll_response;
+    await axios.post('http://localhost:8080/check_for_matched',
+      {
+        'info':introduction,
+        'radius':radius,
+        'lat':10,
+        'lon':10,
+      }).then(res => {
+        poll_response = res.data;
+    });
+
+    if (poll_response['message'] == 'Not Found') {
+      console.log('not found');
+      setTimeout(function() {Check_If_Matched(sender);}, 1000);
+    }
+    else {
+      console.log('STOP POLLING' + sender);
+      if (sender) {
+        let answer_from = poll_response['message']['client']
+        let answer = poll_response['message']['SDP'][1];
+        Add_Answer(answer, answer_from);
+      }
+    }
+  }
+
 
   async function QueryUser(e) {
     e.preventDefault();
@@ -171,7 +278,8 @@ function App() {
   return (
     <div className="App">
       <SubmitButton title="find" onClick={QueryUser}/>
-      <SubmitButton title="find" onClick={QueryUserTesting}/>
+      <SubmitButton title="find2" onClick={QueryUserTesting}/>
+      <SubmitButton title="test" onClick={Add_Answer}/>
     </div>
   );
 }

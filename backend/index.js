@@ -48,14 +48,15 @@ app.post('/check_for_matched', (req, res) => {
     if (user in matched) {
         const userToSend = matched[user];
         res.send({
-            message:    
+            message:
             {
-                'intro' : userToSend.info,
-                'radius' : userToSend.radius,
-                'lon' : userToSend.lon,
-                'lat' : userToSend.lat,
-                'offer' : SDP[userToSend][0],
-                'answer' : SDP[userToSend][1]
+                'client' : {
+                    'intro' : userToSend.info,
+                    'radius' : userToSend.radius,
+                    'lon' : userToSend.lon,
+                    'lat' : userToSend.lat,
+                },
+                'SDP' : [SDP[userToSend][0], SDP[userToSend][1]]
             }
         });
     }
@@ -153,7 +154,7 @@ app.post('/remove_waitlist', (req, res) => {
     const user = ClientFromData(req.body);
 
     if (user.radius == null) {
-        res.status(418).send({message: "We need a radius"});
+        res.status(416).send({message: "We need a radius"});
     }
     if(user.lon == null || user.lat == null){
         res.status(418).send({message: "We need a location"});
@@ -184,6 +185,8 @@ app.post('/add_matched', (req, res) => {
     matched[key] = value;
     to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
 
+    console.log("check")
+    console.log(matched);
     res.status(200).send({
         message: "added key value pair successfully to matched"
     });
