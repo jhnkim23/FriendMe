@@ -34,6 +34,7 @@ function App() {
   }
 
   async function Create_Answer(offer){
+
     offer = JSON.parse(offer)
     await peerConnection.setRemoteDescription(offer);
     let answer = await peerConnection.createAnswer();
@@ -119,7 +120,8 @@ function App() {
           let offer = message['SDP'][0]
           console.log(offer)
           Create_Answer(offer);
-          Add_To_Matched(message['client'], {
+          Add_To_Matched(message['client'], 
+          {
             'info': introduction,
             'radius': radius,
             'lat': 10,
@@ -161,7 +163,6 @@ function App() {
   async function QueryUser(e) {
     e.preventDefault();
     await Radius_Match();
-    Radius_Match_Test();
   }
   async function QueryUserTesting(e){
     e.preventDefault();
@@ -170,6 +171,7 @@ function App() {
   return (
     <div className="App">
       <SubmitButton title="find" onClick={QueryUser}/>
+      <SubmitButton title="find" onClick={QueryUserTesting}/>
     </div>
   );
 }
