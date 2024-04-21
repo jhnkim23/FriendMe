@@ -3,8 +3,12 @@ import axios from 'axios';
 import './App.css';
 
 function App() {
-  const [radius, setRadius] = useState(1);
-  const [introduction, setIntroduction] = useState("");
+  // const [radius, setRadius] = useState(1);
+  // const [introduction, setIntroduction] = useState("");
+  // console.log(radius);
+  // console.log(introduction);
+  var radius = 1;
+  var introduction = "";
   var peerConnection;
   var localStream;
   var remoteStream;
@@ -14,30 +18,47 @@ function App() {
   }, []);
 
   async function initialize() {
-    peerConnection = new RTCPeerConnection();
+    const configuration = {'iceServers' : [{'urls': 'stun:stun.l.google.com:19302'}]}
+    peerConnection = new RTCPeerConnection(configuration);
     localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
     remoteStream = new MediaStream();
 
-    document.getElementById('user1').srcObject = localStream;
-    document.getElementById('user2').srcObject = remoteStream;
+    var video1 = document.getElementById('user1');
+    var video2 = document.getElementById('user2');
 
-    localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream);
+    video1.srcObject = localStream;
+
+    localStream.getTracks().forEach(async (track) => {
+        await peerConnection.addTrack(track, localStream);
     });
 
     peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
+        event.streams[0].getTracks().forEach(async (track) => {
+        await remoteStream.addTrack(track);
         });
     };
+
+    peerConnection.ontrack = peerConnection.ontrack = function(event) {
+      video2.srcObject = event.streams[0];
+    }
   }
 
   async function Create_Offer() {
-    const offer = await peerConnection.createOffer();
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        console.log(event.candidate);
+      }
+    }
+    const offer = await peerConnection.createOffer({ iceRestart: true});
     await peerConnection.setLocalDescription(offer);
   }
 
   async function Create_Answer(offer){
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        console.log(event.candidate);
+      }
+    }
 
     offer = JSON.parse(offer)
     await peerConnection.setRemoteDescription(offer);
@@ -48,7 +69,7 @@ function App() {
     console.log("answer")
     console.log(SDP)
 
-    axios.post('http://localhost:8080/add_SDP',
+    await axios.post('http://localhost:8080/add_SDP',
     {
       'client':
       {
@@ -69,8 +90,9 @@ function App() {
       'value': value
     }).then(res => {
       res = res.data;
-      let message = res['message']
-      console.log("check")
+      let message = res['message'];
+      console.log("check");
+      console.log(key);
       if (message =="added key value pair successfully to matched"){
         Check_If_Matched(false);
       }
@@ -103,6 +125,8 @@ function App() {
   }
 
   async function Radius_Match() {
+    console.log(introduction);
+    console.log(radius);
     axios.post('http://localhost:8080/radius_match', 
       {
         'info':introduction,
@@ -121,6 +145,8 @@ function App() {
           let offer = message['SDP'][0]
           console.log(offer)
           await Create_Answer(offer);
+          console.log(message);
+          console.log(introduction);
           Add_To_Matched(message['client'], 
           {
             'info': introduction,
@@ -151,6 +177,7 @@ function App() {
           let offer = message['SDP'][0]
           //console.log(offer)
           await Create_Answer(offer);
+          console.log(message);
           Add_To_Matched(message['client'], {
             'info': "Test info",
             'radius': 2,
@@ -184,10 +211,7 @@ function App() {
 
       //Remove 2 from waiting list
     axios.post('http://localhost:8080/remove_waitlist', 
-    {'info':introduction,
-    'radius':radius,
-    'lat':10,
-    'lon':10,}).then(res => {
+    remote_user).then(res => {
       console.log(res.data['message']);
     });
 
@@ -222,9 +246,9 @@ function App() {
     {
       'key' : {
         'info': introduction,
-        'radius' : 5,
-        'lat' : 5,
-        'lon' : 5
+        'radius' : radius,
+        'lat' : 10,
+        'lon' : 10
       },
       'value' : remote_user
     }
@@ -253,9 +277,11 @@ function App() {
     }
     else {
       console.log('STOP POLLING' + sender);
+      let answer_from = poll_response['message']['client']
       if (sender) {
-        let answer_from = poll_response['message']['client']
+        console.log(answer_from);
         let answer = poll_response['message']['SDP'][1];
+        console.log(answer);
         await Add_Answer(answer, answer_from);
         console.log(peerConnection.remoteDescription);
         console.log(peerConnection.localDescription);
@@ -263,6 +289,14 @@ function App() {
       else{
         console.log(peerConnection.remoteDescription);
         console.log(peerConnection.localDescription);
+        axios.post("http://localhost:8080/remove_SDP", answer_from);
+        axios.post("http://localhost:8080/remove_SDP", 
+        {
+          'info': introduction,
+          'radius': radius,
+          'lat': 10,
+          'lon': 10,
+        });
       }
     }
   }
@@ -272,9 +306,13 @@ function App() {
     e.preventDefault();
     await Radius_Match();
   }
-  async function QueryUserTesting(e){
+
+
+  function QueryUserTesting(e){
     e.preventDefault();
-    await Radius_Match_Test();
+    introduction = 'test2'
+    radius = 5;
+    Radius_Match();
   }
   return (
     <>
@@ -284,8 +322,8 @@ function App() {
         <SubmitButton title="test" onClick={Add_Answer}/>
       </div>
       <div className="VideoPlayers">
-        <video className="video-player" id="user1" autoPlay playsInline></video>
-        <video className="video-player" id="user2" autoPlay playsInline></video>
+        <video className="video-player" id="user1" autoPlay muted playsInline></video>
+        <video className="video-player" id="user2" autoPlay muted playsInline></video>
       </div>
     </>
   );

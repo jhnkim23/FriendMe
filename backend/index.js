@@ -1,5 +1,6 @@
 var Client = require('./classes/Client');
 var List_Node = require('./classes/List_Node');
+var hash = require('object-hash');
 
 const express = require('express');
 const app = express();
@@ -44,19 +45,22 @@ function ClientFromData(info) {
 
 app.post('/check_for_matched', (req, res) => {
     const user = ClientFromData(req.body);
-
-    if (user in matched) {
-        const userToSend = matched[user];
+    console.log(hash(user));
+    console.log(user);
+    if (hash(user) in matched) {
+        const userToSend = matched[hash(user)];
+        console.log(userToSend);
+        //console.log(SDP[hash(userToSend)]);
         res.send({
             message:
             {
                 'client' : {
-                    'intro' : userToSend.info,
+                    'info' : userToSend.info,
                     'radius' : userToSend.radius,
                     'lon' : userToSend.lon,
                     'lat' : userToSend.lat,
                 },
-                'SDP' : [SDP[userToSend][0], SDP[userToSend][1]]
+                'SDP' : [SDP[hash(userToSend)][0], SDP[hash(userToSend)][1]]
             }
         });
     }
@@ -72,21 +76,21 @@ app.post('/radius_match', (req, res) => {
     const user = ClientFromData(req.body);
     
     // either we get the last node we haven't checked yet, or the dummy head's next
-    var traverse = (user in waitlist_ind) ? waitlist_ind[user].next : waitlist.next;
+    var traverse = (hash(user) in waitlist_ind) ? waitlist_ind[hash(user)].next : waitlist.next;
     
     // make sure we aren't at the end of the list
     if (traverse != tail) {
         const checkWith = traverse.client;
-        waitlist_ind[user] = traverse;
+        waitlist_ind[hash(user)] = traverse;
 
         const distBetween = DistanceBetween(user.lat, user.lon, checkWith.lat, checkWith.lon);
         
-        if (!(checkWith in to_be_matched) && distBetween <= user.radius && distBetween <= checkWith.radius) {
-            to_be_matched.add(checkWith);
+        if (!(hash(checkWith) in to_be_matched) && distBetween <= user.radius && distBetween <= checkWith.radius) {
+            to_be_matched.add(hash(checkWith));
             res.send({
                 message: {
                     'client' : checkWith,
-                    'SDP' : SDP[checkWith] // [offer, answer] -> [offer, null]
+                    'SDP' : SDP[hash(checkWith)] // [offer, answer] -> [offer, null]
                 }
             });
         }
@@ -100,7 +104,7 @@ app.post('/radius_match', (req, res) => {
 
     // if (traverse == tail) {
     else {
-        delete waitlist_ind[user];
+        delete waitlist_ind[hash(user)];
         res.send({
             message: 'EOL'
         });
@@ -140,7 +144,7 @@ app.post('/add_to_waitlist', (req, res) => {
       res.status(418).send({message: "We need a offer"});
     }
     
-    SDP[user] = SDP_data;
+    SDP[hash(user)] = SDP_data;
 
     new_node = new List_Node(tail.prev, tail, user);
     tail.prev.next = new_node;
@@ -161,17 +165,26 @@ app.post('/remove_waitlist', (req, res) => {
         res.status(418).send({message: "We need a location"});
     }
 
-    if (user in waitlist_ind) {
-        user_to_remove = waitlist_ind[user]; //ListNode
+    if (hash(user) in waitlist_ind) {
+        user_to_remove = waitlist_ind[hash(user)]; //ListNode
         user_to_remove.prev.next = user_to_remove.next;
         user_to_remove.next.prev = user_to_remove.prev;
-
+        
+        let curr = waitlist.next;
+        
+        while(curr.client != null){
+            console.log(curr.client);
+        }
+        
         res.status(200).send({
             message: "Client object successfully removed from WL"
         });
     }
 
     else {
+        console.log(user);
+        console.log(waitlist_ind);
+        console.log(hash(user));
         res.status(400).send({
             message: 'No matched user associated with given user to remove'
         });
@@ -183,11 +196,13 @@ app.post('/add_matched', (req, res) => {
     const key = ClientFromData(data['key']);
     const value = ClientFromData(data['value']);
 
-    matched[key] = value;
-    to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
+    matched[hash(key)] = value;
+    // console.log(matched);
+    // console.log(key);
+    //to_be_matched.delete(hash(key)); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
 
-    console.log("check")
-    console.log(matched);
+    // console.log("check")
+    // console.log(matched);
     res.status(200).send({
         message: "added key value pair successfully to matched"
     });
@@ -195,17 +210,27 @@ app.post('/add_matched', (req, res) => {
 
 app.post('/remove_matched', (req, res) => {
     const user = ClientFromData(req.body);
-    delete matched[user];
+    delete matched[hash(user)];
 
+
+    //console.log(matched);
     res.status(200).send({
         message: "removed key value pair successfully from matched"
     });
 });
 
 app.post('/remove_to_be_matched', (req, res) => {
-    const user = ClientFromData(req.body);
-    delete to_be_matched[user];
+    console.log("tbm1");
+    console.log(to_be_matched);
 
+    const user = ClientFromData(req.body);
+
+    console.log(user);
+
+    to_be_matched.delete(hash(user));
+
+    console.log("tbm2");
+    console.log(to_be_matched);
     res.status(200).send({
         message: "removed key successfully from to_be_matched"
     });
@@ -216,7 +241,12 @@ app.post('/add_SDP', (req, res) => {
     const user = ClientFromData(data['client']);
     const add_SDP = data['SDP'];
     
-    SDP[user] = add_SDP;
+    console.log("ADDING TO SDP");
+    console.log(user);
+    console.log(hash(user));
+
+    SDP[hash(user)] = add_SDP;
+    //console.log(SDP);
     res.status(200).send({
         message: "added key value pair successfully to SDP"
     });
@@ -224,7 +254,9 @@ app.post('/add_SDP', (req, res) => {
 
 app.post('/remove_SDP', (req, res) => {
     const user = ClientFromData(req.body);
-    delete SDP[user];
+    delete SDP[hash(user)];
+
+    //console.log(SDP);
 
     res.status(200).send({
         message: "removed key value pair successfully from SDP"
