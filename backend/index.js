@@ -59,7 +59,6 @@ app.post('/check_for_matched', (req, res) => {
             }
         });
     }
-
     else {
         res.send({
             message: 'Not Found'
@@ -69,17 +68,17 @@ app.post('/check_for_matched', (req, res) => {
 
 app.post('/radius_match', (req, res) => {
     const user = ClientFromData(req.body);
-    
+
     // either we get the last node we haven't checked yet, or the dummy head's next
     var traverse = (user in waitlist_ind) ? waitlist_ind[user].next : waitlist.next;
-    
+
     // make sure we aren't at the end of the list
     if (traverse != tail) {
         const checkWith = traverse.client;
         waitlist_ind[user] = traverse;
 
         const distBetween = DistanceBetween(user.lat, user.lon, checkWith.lat, checkWith.lon);
-        
+
         if (!(checkWith in to_be_matched) && distBetween <= user.radius && distBetween <= checkWith.radius) {
             to_be_matched.add(checkWith);
             res.send({
@@ -89,7 +88,6 @@ app.post('/radius_match', (req, res) => {
                 }
             });
         }
-        
         else {
             res.send({
                 message: 'Continue'
@@ -99,6 +97,7 @@ app.post('/radius_match', (req, res) => {
 
     // if (traverse == tail) {
     else {
+        delete waitlist_ind[user];
         res.send({
             message: 'EOL'
         });
@@ -151,12 +150,17 @@ app.post('/add_to_waitlist', (req, res) => {
 
 app.post('/remove_waitlist', (req, res) => {
     const user = ClientFromData(req.body);
+    
+    console.log("Radius", user.radius)
+    console.log("Latitude", user.lon)
+    console.log("Longitude", user.lat)
 
+    if(user.lon == null || user.lat == null){
+        //res.status(416).send({message: "We need a location"});
+        res.status(416).send({message: (7, user.lon)});
+    }
     if (user.radius == null) {
         res.status(418).send({message: "We need a radius"});
-    }
-    if(user.lon == null || user.lat == null){
-        res.status(418).send({message: "We need a location"});
     }
 
     if (user in waitlist_ind) {
@@ -179,10 +183,10 @@ app.post('/remove_waitlist', (req, res) => {
 app.post('/add_matched', (req, res) => {
     const data = req.body;
     const key = ClientFromData(data['key']);
+    
     const value = ClientFromData(data['value']);
 
     matched[key] = value;
-    to_be_matched.delete(key); //move this to 2_poll/when 2 finds 2:6, as like the last thing in that sequence
 
     res.status(200).send({
         message: "added key value pair successfully to matched"

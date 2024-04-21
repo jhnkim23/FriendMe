@@ -1,17 +1,42 @@
-import React, { useState , useEffect } from 'react';
+import React, { useState , useEffect} from 'react';
 import axios from 'axios';
 import './App.css';
+import Slider from './components/Slider/Slider'
 
 function App() {
   const [radius, setRadius] = useState(1);
   const [introduction, setIntroduction] = useState("");
+  const [latitude, setLatitude] = useState(0.0);
+  const [longitude, setLongitude] = useState(0.0);
+  // const [LocalStream, setLocalStream] = useState(null);
+  // const [RemoteStream, setRemoteStream] = useState(null);
+  // const localVideoRef = useRef(null);
+  // const remoteVideoRef = useRef(null);
+
+
   var peerConnection;
   var localStream;
   var remoteStream;
 
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        setLatitude(position.coords.latitude);
+        console.log("Latitude: " + latitude);
+        setLongitude(position.coords.longitude);
+        console.log("Longitude: " + longitude);
+      }, function(error) {
+        console.error("Error Code = " + error.code + " - " + error.message);
+      });
+    }
+    else {
+      console.log("Geolocation API is not available in your browser.");
+    }
+  });
+
   async function initialize() {
     peerConnection = new RTCPeerConnection();
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
     remoteStream = new MediaStream();
 
     // document.getElementById('user-1').srcObject = localStream;
@@ -22,11 +47,12 @@ function App() {
     });
 
     peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
+      event.streams[0].getTracks().forEach((track) => {
         remoteStream.addTrack(track);
-        });
-    };
-  }
+      });
+      
+      };
+    }
 
   async function Create_Offer() {
     const offer = await peerConnection.createOffer();
@@ -47,9 +73,9 @@ function App() {
           'client' :
           {
           'info':introduction,
-          'radius':radius,
-          'lat':10,
-          'lon':10,
+          'radius': 5,
+          'lat': 5,
+          'lon': 5,
           },
           'SDP' : SDP
         }).then(res => {
@@ -61,9 +87,9 @@ function App() {
     axios.post('http://localhost:8080/radius_match', 
       {
         'info':introduction,
-        'radius':radius,
-        'lat':10,
-        'lon':10
+        'radius':5,
+        'lat':5,
+        'lon':5
       }).then(res => {
         res = res.data;
         let message = res['message'];
@@ -77,6 +103,94 @@ function App() {
     });
   }
 
+  async function Add_Answer() {
+    /*Add 6's SDP offer to 2's remote stream*/
+    console.log('Add answer triggered');
+
+    // need polling 
+
+    // let answer = JSON.parse(document.getElementById('answer-sdp').value)
+    // console.log('answer:', answer)
+    // if (!peerConnection.currentRemoteDescription){
+    //     peerConnection.setRemoteDescription(answer);
+    // }
+    
+    let remote_user = null;
+    let message = null;
+
+    /*Get 6's data first from matched dictionary by querying 2:6*/
+    axios.post('http://localhost:8080/check_for_matched', {
+      'info': introduction,
+      'radius': 5,
+      'lat': 5,
+      'lon': 5
+    }).then(async res => {
+      message = res.data['message'];
+      remote_user = {
+        'info' : message['intro'],
+        'radius' : message['radius'],
+        'lat' : message['lat'],
+        'lon' : message['lon']
+      }
+
+      console.log("Remote user: ", remote_user);
+      
+      /*Remove 2 from waiting list */
+      axios.post('http://localhost:8080/remove_waitlist', 
+        {'info': introduction, 'radius' : 5, 'lat': 5, 'lon': 5}).then(res => {
+          console.log(res.data['message']);
+        });
+
+      /*Remove 2 from to_be_matched */
+      axios.post('http://localhost:8080/remove_to_be_matched', 
+        {
+          'info':introduction,
+          'radius':5,
+          'lat':5,
+          'lon':5
+        }).then(res => {
+          console.log(res.data);
+        });
+
+      /*add 6:2 -> signifies to client 1 that client 2 has agreed*/
+      axios.post('http://localhost:8080/add_matched',
+        {
+          'key' : remote_user,
+          'value' : {
+            'info': introduction,
+            'radius' : 5,
+            'lat' : 5,
+            'lon' : 5
+          }
+        }
+      ).then(res => {
+        console.log(res.data);
+      });
+
+      /*then remove 2:6*/
+      axios.post('http://localhost:8080/remove_matched',
+        {
+          'key' : {
+            'info': introduction,
+            'radius' : 5,
+            'lat' : 5,
+            'lon' : 5
+          },
+          'value' : remote_user
+        }
+      ).then(res => {
+        console.log(res.data);
+      });
+
+
+        console.log(res.data);
+      });
+  }
+
+  function handleIntroInput(e) {
+    setIntroduction(e.target.value)
+  };
+
   async function QueryUser(e) {
     e.preventDefault();
     Radius_Match();
@@ -84,7 +198,21 @@ function App() {
 
   return (
     <div className="App">
+      <h2>Friend.me</h2>
+
+      {/*Maybe make a componenet for the videos*/}
+      <div id = "videos">
+        <video className="video-player" id="user-1" autoPlay playsInline></video>
+        <video className="video-player" id="user-2" autoPlay playsInline></video>
+      </div>
+
+      <label htmlFor="userInput">Tell us a little bit about yourself: </label>
+      <input type="text" id="userInput" name="userInput" placeholder="Type your introduction" value = {introduction} onChange = {handleIntroInput}/>
+
+      <Slider radius = {radius} setRadius = {setRadius}/>
+
       <SubmitButton title="find" onClick={QueryUser}/>
+      <SubmitButton title = "test" onClick = {Add_Answer}/>
     </div>
   );
 }
