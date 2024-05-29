@@ -15,7 +15,7 @@ function App() {
 
   async function initialize() {
     peerConnection = new RTCPeerConnection();
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    localStream = await navigator.mediaDevices.getUserMedia({video:true});
     remoteStream = new MediaStream();
 
     document.getElementById('user1').srcObject = localStream;
@@ -302,5 +302,5 @@ return (
 //     <video ref={ref} class="video-player" id={id} autoplay playsinline></video>
 //   )
 // }
-
+''
 export default App;
