@@ -32,6 +32,9 @@ let to_be_matched = new Set();
 // Client -> [offer, answer]
 let SDP = {};
 
+// Client -> ice candidate
+let iceCandidates = {};
+
 function ClientFromData(info) {
     const userData = info;
     const introduction = userData['info'];
@@ -42,6 +45,27 @@ function ClientFromData(info) {
 
     return user;
 }
+
+app.post('/send_ice_candidate', (req, res) => {
+    const userHash = hash(ClientFromData(req.body.client));
+
+    if (!iceCandidates[userHash]) {
+        iceCandidates[userHash] = [];
+    }
+
+    iceCandidates[userHash].push(req.body.candidate);
+    res.status(200).send({ message: "Candidate received" });
+});
+
+app.post('/get_ice_candidates', (req, res) => {
+    const userHash = hash(ClientFromData(req.body.client));
+
+    const candidates = iceCandidates[userHash] || [];
+    res.status(200).send({ candidates });
+
+    // Optionally clear candidates after sending
+    //delete iceCandidates[userHash];
+});
 
 app.post('/check_for_matched', (req, res) => {
     const user = ClientFromData(req.body);

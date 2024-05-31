@@ -18,37 +18,78 @@ function App() {
   }, []);
 
   async function initialize() {
-    const configuration = {'iceServers' : [{'urls': 'stun:stun.l.google.com:19302'}]}
+    const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]};
     peerConnection = new RTCPeerConnection(configuration);
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-    remoteStream = new MediaStream();
 
-    var video1 = document.getElementById('user1');
-    var video2 = document.getElementById('user2');
-
-    video1.srcObject = localStream;
-
-    localStream.getTracks().forEach(async (track) => {
-        await peerConnection.addTrack(track, localStream);
-    });
-
-    peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach(async (track) => {
-        await remoteStream.addTrack(track);
-        });
+    // Event handler for ICE candidates
+    peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+            console.log("Sending ICE candidate:", event.candidate);
+            axios.post('http://localhost:8080/send_ice_candidate', {
+                candidate: event.candidate,
+                client: { info: introduction, radius: radius, lat: 10, lon: 10 }
+            });
+        }
     };
 
-    peerConnection.ontrack = peerConnection.ontrack = function(event) {
-      video2.srcObject = event.streams[0];
-    }
+    // Event handler for connection state changes
+    peerConnection.addEventListener('connectionstatechange', event => {
+        switch (peerConnection.connectionState) {
+            case 'connected':
+                console.log("Peers connected!");
+                break;
+            case 'disconnected':
+            case 'failed':
+                console.log("Connection failed!");
+                break;
+            case 'closed':
+                console.log("Connection closed!");
+                break;
+        }
+    });
+
+    // Get user media
+    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+    remoteStream = new MediaStream();
+
+    const video1 = document.getElementById('user1');
+    const video2 = document.getElementById('user2');
+
+    video1.srcObject = localStream;
+    video2.srcObject = remoteStream;
+
+    // Add tracks to the peer connection
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    // Handle remote tracks
+    peerConnection.ontrack = (event) => {
+        event.streams[0].getTracks().forEach(track => {
+            remoteStream.addTrack(track);
+        });
+
+        video2.srcObject = remoteStream;
+    };
+}
+
+  async function getIceCandidates() {
+    const response = await axios.post('http://localhost:8080/get_ice_candidates', {
+        client: { info: introduction, radius: radius, lat: 10, lon: 10 }
+    });
+
+    response.data.candidates.forEach(candidate => {
+        console.log("Adding received ICE candidate:", candidate);
+        peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    });
   }
 
   async function Create_Offer() {
-    peerConnection.onicecandidate = async (event) => {
-      if (event.candidate) {
-        console.log(event.candidate);
-      }
-    }
+    // peerConnection.onicecandidate = async (event) => {
+    //   if (event.candidate) {
+    //     console.log(event.candidate);
+    //   }
+    // }
     const offer = await peerConnection.createOffer({ iceRestart: true});
     await peerConnection.setLocalDescription(offer);
   }
