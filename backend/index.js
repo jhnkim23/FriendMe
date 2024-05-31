@@ -32,6 +32,10 @@ let to_be_matched = new Set();
 // Client -> [offer, answer]
 let SDP = {};
 
+// Store icecandidates for each client
+// Client -> [iceCandidate0, iceCandidate1, ...]
+let ice_candidates = {};
+
 function ClientFromData(info) {
     const userData = info;
     const introduction = userData['info'];
@@ -60,7 +64,7 @@ app.post('/check_for_matched', (req, res) => {
                     'lon' : userToSend.lon,
                     'lat' : userToSend.lat,
                 },
-                'SDP' : [SDP[hash(userToSend)][0], SDP[hash(userToSend)][1]]
+                'SDP' : [SDP[hash(userToSend)][0], SDP[hash(userToSend)][1]],
             }
         });
     }
@@ -90,7 +94,8 @@ app.post('/radius_match', (req, res) => {
             res.send({
                 message: {
                     'client' : checkWith,
-                    'SDP' : SDP[hash(checkWith)] // [offer, answer] -> [offer, null]
+                    'SDP' : SDP[hash(checkWith)], // [offer, answer] -> [offer, null]
+                    'iceCandidates': ice_candidates[hash(checkWith)]
                 }
             });
         }
@@ -263,3 +268,19 @@ app.post('/remove_SDP', (req, res) => {
     });
 });
 
+app.post('/add_ice_candidate', (req, res) => {
+    const data = req.body;
+    const user = ClientFromData(data['client']);
+    const ice_candidate = data['iceCandidate'];
+
+    console.log(data);
+
+    if (hash(user) in ice_candidates)
+        ice_candidates[hash(user)].push(ice_candidate);
+    else
+        ice_candidates[hash(user)] = [ice_candidate];
+
+    res.status(200).send({
+        message: "added ice candidate successfully to ice_candidates"
+    });
+});

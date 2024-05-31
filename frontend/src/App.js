@@ -27,47 +27,64 @@ function App() {
     var video2 = document.getElementById('user2');
 
     video1.srcObject = localStream;
+    video2.srcObject = remoteStream;
 
     localStream.getTracks().forEach(async (track) => {
         await peerConnection.addTrack(track, localStream);
     });
 
     peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach(async (track) => {
-        await remoteStream.addTrack(track);
+        event.streams[0].getTracks().forEach((track) => {
+          remoteStream.addTrack(track);
         });
     };
 
-    peerConnection.ontrack = peerConnection.ontrack = function(event) {
-      video2.srcObject = event.streams[0];
-    }
+    peerConnection.addEventListener('connectionstatechange', event => {
+      if (peerConnection.connectionState === 'connected') {
+        console.log('connected');
+      }
+    });
   }
 
   async function Create_Offer() {
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
-        console.log(event.candidate);
+        axios.post('http://localhost:8080/add_ice_candidate',
+          {
+            'client':
+            {
+              'info': introduction,
+              'radius': radius,
+              'lat': 10,
+              'lon': 10
+            },
+            'iceCandidate': event.candidate
+          }).then(res => {
+            console.log(res.data)
+          });
       }
     }
     const offer = await peerConnection.createOffer({ iceRestart: true});
     await peerConnection.setLocalDescription(offer);
   }
 
-  async function Create_Answer(offer){
-    peerConnection.onicecandidate = async (event) => {
-      if (event.candidate) {
-        console.log(event.candidate);
-      }
-    }
-
-    offer = JSON.parse(offer)
+  async function Create_Answer(offer, iceCandidates){
+    offer = JSON.parse(offer);
     await peerConnection.setRemoteDescription(offer);
+    for (var i = 0; i < iceCandidates.length; i++)
+      await peerConnection.addIceCandidate(iceCandidates[i]);
     let answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     //This might be better if the method was like split in two
     let SDP = [null, JSON.stringify(peerConnection.localDescription)];
     console.log("answer")
     console.log(SDP)
+
+    console.log(peerConnection.getLocalStreams());
+    console.log(peerConnection.getRemoteStreams());
+    console.log(localStream);
+    console.log(remoteStream);
+
 
     await axios.post('http://localhost:8080/add_SDP',
     {
@@ -108,6 +125,7 @@ function App() {
     await Create_Offer();
     let SDP = [JSON.stringify(peerConnection.localDescription), null];
     console.log(SDP);
+
     axios.post('http://localhost:8080/add_to_waitlist',
         {
           'client' :
@@ -117,7 +135,7 @@ function App() {
           'lat':10,
           'lon':10,
           },
-          'SDP' : SDP
+          'SDP' : SDP,
         }).then(res => {
           console.log(res.data);
           Check_If_Matched(true);
@@ -142,9 +160,10 @@ function App() {
           Add_To_Waitlist();
         else {
           console.log('match');
-          let offer = message['SDP'][0]
-          console.log(offer)
-          await Create_Answer(offer);
+          let offer = message['SDP'][0];
+          let iceCandidates = message['iceCandidates'];
+
+          await Create_Answer(offer, iceCandidates);
           console.log(message);
           console.log(introduction);
           Add_To_Matched(message['client'], 
@@ -192,6 +211,7 @@ function App() {
   async function Add_Answer(answer, answer_from) {
     answer = JSON.parse(answer);
     await peerConnection.setRemoteDescription(answer);
+
     console.log('Add answer triggered');
     //Add 6's SDP offer to 2's remote stream
     //let SDP = [JSON.stringify(peerConnection.localDescription), null];
@@ -215,48 +235,46 @@ function App() {
       console.log(res.data['message']);
     });
 
-  //Remove 2 from to_be_matched
-  axios.post('http://localhost:8080/remove_to_be_matched', 
-    {
-      'info':introduction,
-      'radius':radius,
-      'lat':10,
-      'lon':10,
-    }).then(res => {
-      console.log(res.data);
-    });
-
-  //add 6:2 -> signifies to client 1 that client 2 has agreed
-  axios.post('http://localhost:8080/add_matched',
-    {
-      'key' : remote_user,
-      'value' : {
+    //Remove 2 from to_be_matched
+    axios.post('http://localhost:8080/remove_to_be_matched', 
+      {
         'info':introduction,
         'radius':radius,
         'lat':10,
         'lon':10,
+      }).then(res => {
+        console.log(res.data);
+      });
+
+    //add 6:2 -> signifies to client 1 that client 2 has agreed
+    axios.post('http://localhost:8080/add_matched',
+      {
+        'key' : remote_user,
+        'value' : {
+          'info':introduction,
+          'radius':radius,
+          'lat':10,
+          'lon':10,
+        }
       }
-    }
-  ).then(res => {
-    console.log(res.data);
-  });
+    ).then(res => {
+      console.log(res.data);
+    });
 
-  //then remove 2:6
-  axios.post('http://localhost:8080/remove_matched',
-    {
-      'key' : {
-        'info': introduction,
-        'radius' : radius,
-        'lat' : 10,
-        'lon' : 10
-      },
-      'value' : remote_user
-    }
-  ).then(res => {
-    console.log(res.data);
-  });
-
-    
+    //then remove 2:6
+    axios.post('http://localhost:8080/remove_matched',
+      {
+        'key' : {
+          'info': introduction,
+          'radius' : radius,
+          'lat' : 10,
+          'lon' : 10
+        },
+        'value' : remote_user
+      }
+    ).then(res => {
+      console.log(res.data);
+    });
   }
 
   async function Check_If_Matched(sender) {
@@ -282,9 +300,15 @@ function App() {
         console.log(answer_from);
         let answer = poll_response['message']['SDP'][1];
         console.log(answer);
+
         await Add_Answer(answer, answer_from);
         console.log(peerConnection.remoteDescription);
         console.log(peerConnection.localDescription);
+        
+        console.log(peerConnection.getLocalStreams());
+        console.log(peerConnection.getRemoteStreams());
+        console.log(localStream);
+        console.log(remoteStream);
       }
       else{
         console.log(peerConnection.remoteDescription);
