@@ -39,7 +39,7 @@ function App() {
         });
     };
 
-    peerConnection.addEventListener('connectionstatechange', event => {
+    peerConnection.addEventListener('connectionstatechange', e => {
       if (peerConnection.connectionState === 'connected') {
         console.log('connected');
       }
@@ -69,21 +69,41 @@ function App() {
   }
 
   async function Create_Answer(offer, iceCandidates){
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        axios.post('http://localhost:8080/add_ice_candidate',
+          {
+            'client':
+            {
+              'info': introduction,
+              'radius': radius,
+              'lat': 10,
+              'lon': 10
+            },
+            'iceCandidate': event.candidate
+          }).then(res => {
+            console.log(res.data)
+          });
+      }
+    }
+
     offer = JSON.parse(offer);
     await peerConnection.setRemoteDescription(offer);
+
     for (var i = 0; i < iceCandidates.length; i++)
       await peerConnection.addIceCandidate(iceCandidates[i]);
+
     let answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
+
     //This might be better if the method was like split in two
     let SDP = [null, JSON.stringify(peerConnection.localDescription)];
-    console.log("answer")
-    console.log(SDP)
-
-    console.log(peerConnection.getLocalStreams());
-    console.log(peerConnection.getRemoteStreams());
-    console.log(localStream);
-    console.log(remoteStream);
+    
+    console.log("answer", SDP)
+    console.log("p2p localstreams", peerConnection.getLocalStreams());
+    console.log("p2p remotestreams", peerConnection.getRemoteStreams());
+    console.log("localstream", localStream);
+    console.log("remotestream", remoteStream);
 
 
     await axios.post('http://localhost:8080/add_SDP',
@@ -108,8 +128,10 @@ function App() {
     }).then(res => {
       res = res.data;
       let message = res['message'];
+      
       console.log("check");
       console.log(key);
+      
       if (message =="added key value pair successfully to matched"){
         Check_If_Matched(false);
       }
@@ -123,6 +145,7 @@ function App() {
 
   async function Add_To_Waitlist() {
     await Create_Offer();
+    
     let SDP = [JSON.stringify(peerConnection.localDescription), null];
     console.log(SDP);
 
@@ -177,40 +200,13 @@ function App() {
     });
   }
 
-  async function Radius_Match_Test() {
-    axios.post('http://localhost:8080/radius_match', 
-      {
-        'info':"Test info",
-        'radius':2,
-        'lat':10,
-        'lon':10
-      }).then(async res => {
-        res = res.data;
-        let message = res['message'];
-        if (message == 'Continue')
-          Radius_Match();
-        else if (message == 'EOL')
-          Add_To_Waitlist();
-        else {
-          console.log('match');
-          let offer = message['SDP'][0]
-          //console.log(offer)
-          await Create_Answer(offer);
-          console.log(message);
-          Add_To_Matched(message['client'], {
-            'info': "Test info",
-            'radius': 2,
-            'lat': 10,
-            'lon': 10
-          })
-        }
-    });
-  }
-
-
-  async function Add_Answer(answer, answer_from) {
+  async function Add_Answer(answer, answer_from, iceCandidates) {
     answer = JSON.parse(answer);
     await peerConnection.setRemoteDescription(answer);
+    console.log(iceCandidates)
+
+    for (var i = 0; i < iceCandidates.length; i++)
+      await peerConnection.addIceCandidate(iceCandidates[i]);
 
     console.log('Add answer triggered');
     //Add 6's SDP offer to 2's remote stream
@@ -301,7 +297,9 @@ function App() {
         let answer = poll_response['message']['SDP'][1];
         console.log(answer);
 
-        await Add_Answer(answer, answer_from);
+        let iceCandidates = poll_response['message']['iceCandidates'];
+
+        await Add_Answer(answer, answer_from, iceCandidates);
         console.log(peerConnection.remoteDescription);
         console.log(peerConnection.localDescription);
         
@@ -310,9 +308,7 @@ function App() {
         console.log(localStream);
         console.log(remoteStream);
       }
-      else{
-        console.log(peerConnection.remoteDescription);
-        console.log(peerConnection.localDescription);
+      else {
         axios.post("http://localhost:8080/remove_SDP", answer_from);
         axios.post("http://localhost:8080/remove_SDP", 
         {
@@ -320,6 +316,14 @@ function App() {
           'radius': radius,
           'lat': 10,
           'lon': 10,
+        });
+        axios.post("http://localhost:8080/remove_ice_candidates", answer_from);
+        axios.post("http://localhost:8080/remove_ice_candidates", 
+        {
+          'info': introduction,
+          'radius': radius,
+          'lat': 10,
+          'lon': 10
         });
       }
     }
@@ -338,6 +342,7 @@ function App() {
     radius = 5;
     Radius_Match();
   }
+
   return (
     <>
       <div className="PeerConnection">
@@ -354,9 +359,9 @@ function App() {
 }
 
 function SubmitButton({title, onClick}) {
-return (
-  <button onClick={onClick}> {title} </button>
-)
+  return (
+    <button onClick={onClick}> {title} </button>
+  )
 }
 
 // function VideoPlayer({ref, id}) {
